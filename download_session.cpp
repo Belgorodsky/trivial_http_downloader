@@ -278,12 +278,6 @@ void download_session::recv_n_flush_rest(
 				<< m_er_status << '\n';
 			return;
 		}
-		else if (!bytes)
-		{
-			std::cerr << "cannot deduce file to download\n";
-			m_er_status = -1;
-			return;
-		}
 
 		std::string_view content(m_response.data(), bytes);
 
