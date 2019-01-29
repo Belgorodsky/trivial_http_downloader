@@ -52,6 +52,12 @@ void download_session::connect()
 			       	}
 		);
 	}
+	else
+	{
+		std::cerr << "cannot connect\n";
+		m_er_status = -1;
+	}
+
 	for (auto && addr : addris)
 	{
 		if (m_sock)
@@ -61,13 +67,6 @@ void download_session::connect()
 				addr->ai_socktype,
 				addr->ai_protocol
 			);
-//			int flag = 1;
-//			setsockopt(
-//					*m_sock,
-//					addr->ai_protocol,
-//				       	TCP_NODELAY,
-//				       	(char *) &flag, sizeof(int)
-//			);
 
 			if (*m_sock < 0)
 			{
@@ -97,7 +96,6 @@ void download_session::connect()
 			}
 		}
 	}
-	m_er_status = errno;
 }
 
 void download_session::send_http_request()
@@ -462,7 +460,7 @@ bool download_session::init_file_nommap()
 	if (*m_file < 0)
 	{
 		m_er_status = errno;
-		std::cerr << "cannot open to write'"
+		std::cerr << "cannot open to write '"
 			  << m_pz->local_filename()
 			  << "' :"
 			  << strerror(m_er_status)

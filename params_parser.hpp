@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <ostream>
 
 class params_parser
 {
@@ -15,6 +16,7 @@ class params_parser
 
 	private:
 		void parse(int argc , char *argv[]);
+		void print_help(std::string_view exec_name, std::ostream &os);
 
 	private:
 		std::string m_scheme;

@@ -11,8 +11,7 @@ void params_parser::parse(int argc , char *argv[])
 {
 	if (argc < 2)
 	{
-		std::cerr << "Usage: " << argv[0]
-		       	  << " <url> [<local_filename>]\n";
+		print_help(argv[0], std::cerr);
 		return;
 	}
 	std::string_view url = argv[1];
@@ -39,6 +38,10 @@ void params_parser::parse(int argc , char *argv[])
 		host = url.substr(pos, end_of_host_delim_pos - pos); 
 		pos = end_of_host_delim_pos + std::size(end_of_host_delim) - 1;
 	}
+	else
+	{
+		host = url.substr(pos);
+	}
 
 	remote_filename = pos < url.length() ? url.substr(pos) :
 		std::string_view{};
@@ -53,8 +56,14 @@ void params_parser::parse(int argc , char *argv[])
 		}
 		else
 		{
-			ofilename = remote_filename;
+			remote_filename = std::string_view{};
 		}
+	}
+
+	if (ofilename.empty())
+	{
+		std::cerr << "cannot deduce local filename\n";
+		print_help(argv[0], std::cerr);
 	}
 
 	m_scheme.assign(scheme.data(), scheme.length());
@@ -67,4 +76,11 @@ void params_parser::parse(int argc , char *argv[])
 		ofilename.data(),
 		ofilename.length()
 	);
+}
+
+
+void params_parser::print_help(std::string_view exec_name, std::ostream &os)
+{
+	os << "Usage: " << exec_name
+		<< " <url> [<local_filename>]\n";
 }
