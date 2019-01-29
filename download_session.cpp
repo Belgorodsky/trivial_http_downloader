@@ -308,7 +308,9 @@ void download_session::recv_content(std::string_view first_bytes)
 		m_content_cur_pos,
 		m_content_length
 	);
+#if defined(__APPLE__)
 	fcntl(*m_sock, F_GLOBAL_NOCACHE, 1);
+#endif
 	recv_n_flush_rest(&download_session::flush_some);
 }
 
