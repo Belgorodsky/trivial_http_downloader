@@ -37,14 +37,14 @@ void params_parser::parse(int argc , char *argv[])
 	{
 		host = url.substr(pos, end_of_host_delim_pos - pos); 
 		pos = end_of_host_delim_pos + std::size(end_of_host_delim) - 1;
+		remote_filename = pos < url.length() ? url.substr(pos) :
+			std::string_view{};
 	}
 	else
 	{
 		host = url.substr(pos);
 	}
 
-	remote_filename = pos < url.length() ? url.substr(pos) :
-		std::string_view{};
 	if (ofilename.empty())
 	{
 		constexpr char delim[] ("/");
@@ -53,10 +53,6 @@ void params_parser::parse(int argc , char *argv[])
 		{
 			pos = last_delim + std::size(delim) - 1;
 			ofilename = remote_filename.substr(pos);
-		}
-		else
-		{
-			remote_filename = std::string_view{};
 		}
 	}
 
@@ -68,6 +64,7 @@ void params_parser::parse(int argc , char *argv[])
 
 	m_scheme.assign(scheme.data(), scheme.length());
 	m_host.assign(host.data(), host.length());
+
 	m_remote_filename.assign(
 			remote_filename.data(), 
 			remote_filename.length()
