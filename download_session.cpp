@@ -260,8 +260,7 @@ void download_session::recv_n_flush_rest(
 	void (download_session::*flusher)(std::string_view)
 ) 
 {
-	constexpr char header_end[]("\r\n\r\n");
-	m_response.clear();
+	m_response.resize(PIPE_BUF, '\0');
 	while (m_content_cur_pos < m_content_length)
 	{
 		auto bytes = recv(
