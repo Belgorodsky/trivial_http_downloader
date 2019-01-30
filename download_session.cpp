@@ -278,6 +278,15 @@ void download_session::recv_n_flush_rest(
 				<< m_er_status << '\n';
 			return;
 		}
+		if (int err = errno;
+				!bytes && err != EAGAIN  &&
+				m_content_length == std::numeric_limits<size_t>::max()
+		)
+		{
+			m_er_status = err;
+			std::cout << "finished!\n";
+			return;
+		}
 
 		std::string_view content(m_response.data(), bytes);
 
@@ -287,7 +296,7 @@ void download_session::recv_n_flush_rest(
 			m_content_cur_pos,
 			m_content_length
 		);
-		m_response.resize(m_content_length, '\0');
+		m_response.resize(PIPE_BUF, '\0');
 	}
 
 
@@ -334,12 +343,7 @@ void download_session::flush_some(std::string_view first_bytes)
 		dst
 	);
 
-//	std::cout << "download_session::flush_some " <<
-//	m_content_cur_pos << '\n';
-
 	m_content_cur_pos += first_bytes.length();
-//	std::cout << "download_session::flush_some " <<
-//	m_content_cur_pos << '\n';
 }
 
 void download_session::flush_some_nommap(std::string_view first_bytes)
@@ -358,8 +362,6 @@ void download_session::flush_some_nommap(std::string_view first_bytes)
 			  << '\n';
 		return;
 	}
-
-	std::cout << m_content_cur_pos << std::endl;
 
 	m_content_cur_pos += bytes;
 }
@@ -394,7 +396,6 @@ bool download_session::init_file()
 		return false;
 	}
 
-//	if (m_content_length != std::numeric_limits<size_t>::max())
 	{
 
 		ftruncate(*m_file, m_content_length);
@@ -440,6 +441,16 @@ bool download_session::init_file()
 
 bool download_session::init_file_nommap()
 {
+	int flags;
+
+	if(-1 == (flags = fcntl(*m_sock, F_GETFL, 0)))
+	{
+		flags = 0;
+	}
+	if (fcntl(*m_sock, F_SETFL, flags | O_NONBLOCK))
+	{
+		std::cerr << "cannot set socket as nonblock: " <<  strerror(errno) << '\n'; 
+	}
 	m_file = shrtr::file_uptr(
 		new(std::nothrow) int,
 		[](int *f) { if (f) { close(*f); delete f; } }
