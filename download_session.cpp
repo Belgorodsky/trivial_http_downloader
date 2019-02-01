@@ -156,13 +156,20 @@ void download_session::recv_http_response()
 				);
 			if (!bytes)
 				break;
-			if (bytes < 0)
+			if (m_er_status = errno; bytes < 0)
 			{
-				m_er_status = errno;
-				std::cerr 
-					<< "cannot recv http request, errno: " 
-					<< m_er_status << '\n';
-				return;
+				if (m_er_status != EAGAIN)
+				{
+					std::cerr 
+						<< "cannot recv http request, errno: " 
+						<< m_er_status << '\n';
+					return;
+				}
+				else
+				{
+					continue;
+				}
+				m_er_status = 0;
 			}
 			header_end_pos = m_response.find(header_end);
 			if (!header_received)
@@ -205,6 +212,8 @@ bool download_session::parse_header(std::string_view header)
 	constexpr char status_subkey[]("HTTP");
 	constexpr char status_subval[]("200");
 	constexpr char content_length[]("Content-Length:");
+	constexpr char transfer_encoding[]("Transfer-Encoding:");
+	constexpr char chunked_encoding[]("chunked");
 	constexpr char header_del[]("\r\n");
 	constexpr char wses[](" \t\f\v\n\r");
 
@@ -251,6 +260,14 @@ bool download_session::parse_header(std::string_view header)
 				m_content_length = res;
 			}
 		}
+		else if (
+			transfer_encoding == key.
+			substr(0, std::size(transfer_encoding) - 1) &&
+			chunked_encoding == val
+		)
+		{
+			m_chunked_encoding = true;
+		}
 		prev = next_del + std::size(header_del) - 1;
 	}
 	return true;
@@ -269,13 +286,20 @@ void download_session::recv_n_flush_rest(
 				m_response.size(),
 				m_ignore_sigpipe
 			);
-		if (bytes < 0)
+		if (m_er_status = errno; bytes < 0)
 		{
-			m_er_status = errno;
-			std::cerr 
-				<< "cannot recv http request, errno: " 
-				<< m_er_status << '\n';
-			return;
+			if (m_er_status != EAGAIN)
+			{
+				std::cerr 
+					<< "cannot recv http request, errno: " 
+					<< m_er_status << '\n';
+				return;
+			}
+			else
+			{
+				continue;
+			}
+			m_er_status = 0;
 		}
 		if (int err = errno;
 				!bytes && err != EAGAIN  &&
@@ -290,11 +314,7 @@ void download_session::recv_n_flush_rest(
 		std::string_view content(m_response.data(), bytes);
 
 		(this->*flusher)(content);
-		m_progr_printer.print(
-			std::cout, 
-			m_content_cur_pos,
-			m_content_length
-		);
+		if (m_last_chunk) break;
 		m_response.resize(PIPE_BUF, '\0');
 	}
 
@@ -347,22 +367,81 @@ void download_session::flush_some(std::string_view first_bytes)
 
 void download_session::flush_some_nommap(std::string_view first_bytes)
 {
-	auto bytes = write(
+	if (m_chunked_encoding)
+	{
+		constexpr char end_of_chunk_line[]("\r\n");
+		constexpr char end_of_chunks[]("0\r\n");
+		size_t find_start = 0;
+		size_t pos = 0;
+		for (;
+				pos = first_bytes.find(end_of_chunk_line, find_start),
+				pos != std::string_view::npos;
+				find_start = pos + std::size(end_of_chunk_line) - 1
+			)
+		{
+			if (m_odd_chunk_line)
+			{
+				static size_t counter = 1;
+				auto size_line = first_bytes.substr(find_start, pos - find_start);
+
+				size_t res;
+				if (auto[p, ec] = std::from_chars(
+							size_line.data(),
+							size_line.data() + 
+							size_line.length(),
+							res
+							);
+						ec == std::errc()
+				   )
+				{
+					m_last_chunk = !res;
+				}
+			}
+			else
+			{
+				static size_t counter = 1;
+				auto chunk_line = first_bytes.substr(find_start, pos - find_start);
+				auto bytes = write(
+						*m_file, 
+						chunk_line.data(),
+						chunk_line.length()
+						); 
+				if (bytes < 0
+				   )
+				{
+					std::cout << '\n';
+					std::cerr << "cannot write: "
+						<< strerror(errno)
+						<< '\n';
+					return;
+				}
+
+				m_content_cur_pos += bytes;
+			}
+			m_odd_chunk_line = !m_odd_chunk_line;
+
+		}
+		first_bytes = first_bytes.
+			substr(find_start);
+		auto bytes = write(
 				*m_file, 
 				first_bytes.data(),
 				first_bytes.length()
-			); 
-	if (bytes < 0
-	)
-	{
-		std::cout << '\n';
-		std::cerr << "cannot write: "
-			  << strerror(errno)
-			  << '\n';
-		return;
+				); 
+		if (bytes < 0
+		   )
+		{
+			std::cout << '\n';
+			std::cerr << "cannot write: "
+				<< strerror(errno)
+				<< '\n';
+			return;
+		}
 	}
-
-	m_content_cur_pos += bytes;
+	else
+	{
+		std::cerr << "unsupported Transfer-Encoding\n";
+	}
 }
 
 bool download_session::init_file()

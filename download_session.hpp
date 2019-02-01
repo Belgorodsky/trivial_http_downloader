@@ -26,6 +26,9 @@ class download_session
 		bool init_file();
 		bool init_file_nommap();
 	private:
+		bool m_chunked_encoding = false;
+		bool m_odd_chunk_line = true;
+		bool m_last_chunk = false;
 		int m_ignore_sigpipe;
 		int m_er_status = 0;
 		progress_printer m_progr_printer;
